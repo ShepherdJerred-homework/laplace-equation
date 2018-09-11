@@ -1,0 +1,370 @@
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Comp 425 Project</title>
+    <link rel="stylesheet" href="../standard.css" type="text/css"/>
+    <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="/gfoust/sh/scripts/shCore.js"></script>
+    <script type="text/javascript" src="/gfoust/sh/scripts/shBrushCpp.js"></script>
+    <script type="text/javascript">
+      SyntaxHighlighter.defaults.gutter = false;
+      SyntaxHighlighter.all();
+    </script>
+    <link type="text/css" rel="stylesheet" href="/gfoust/sh/styles/shCore.css"/>
+    <link type="text/css" rel="stylesheet"
+          href="/gfoust/sh/styles/shThemeFoust.css"/>
+    <base target="_top"/>
+    <style>
+      img { display: block; }
+      .proc {
+          font-style: italic;
+          text-decoration: underline;
+      }
+      .ro { color: #800;  }
+      .ro::before { content: "(" }
+      .ro::after { content: ")" }
+      .rw { color: #080;  }
+      .proc, .ro, .rw {
+          padding-right: 6ex;
+          text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>Overview</h3>
+    <p>
+      For this project we will we will be writing a program to solve Laplace's
+      equation.
+    </p>
+    <center>
+      \(\nabla^2 t =
+      \frac{\partial^2 t}{\partial x^2} +
+      \frac{\partial^2 t}{\partial y^2}
+      = 0\)
+    </center>
+    <p>
+      This equation can be used to describe heat transfer.  For example,
+      suppose you have a piece of sheet metal with heat applied to certain
+      points around the edge.  The heat will gradually spread through the
+      sheet metal until it reaches a point where Laplace's equation is
+      satisfied.  The image below shows an example of a surface satisfying
+      Laplace's equation where heat has been applied to the left and right
+      edge.
+    </p>
+    <center>
+      <img src="img/laplace.png"/>
+      <small>Source: https://nibot-lab.livejournal.com/48933.html</small>
+    </center>
+    <p>
+      As you can see in the image, the sheet has been divided into a grid of
+      cells, and each cell has been assigned a temperature.  This
+      discretization makes it possible to solve the Laplace equation using the
+      Jacobi method.  This is an iterative method where you repeatedly replace
+      the value of a cell with the average of its neighbors.
+    </p>
+    <center>
+      \(m_{i, j} = (m_{i, j - 1} + m_{i - 1, j} + m_{i, j + 1} + m_{i + 1,
+      j})/4\)
+    </center>
+    <p>
+      However, when performing this method in your program, you should not
+      actually make any changes to your matrix because they would affect
+      future calculations.  Instead, you should create a new version of your
+      matrix that contains the updated values.  This is reflected below by
+      adding a superscript to describe each new version of the matrix.
+    </p>
+    <center>
+      \(m^{k+1}_{i, j} = (m^k_{i, j - 1} + m^k_{i - 1, j} + m^k_{i, j + 1} + m^k_{i +
+      1, j})/4\)
+    </center>
+    <p>
+      You will repeat this calculation until you reach a <dfn>fixed
+      point</dfn>&mdash;that is, a point where \(m^k\) = \(m^{k+1}\).
+    </p>
+    <h3>Implementation</h3>
+    <p>
+      We will represent our sheet metal as an \(M \times N\) array, where
+      \(M\) and \(N\) are selected by the user.  We will assume there is a
+      layer of &ldquo;air&rdquo; around the sheet metal which does not change.
+      Thus, you should actually represent your sheet metal as an \((M + 2)
+      \times (N + 2)\) array so that there is an extra row and column at the
+      beginning and the end.  (This has an added advantage of eliminating edge
+      cases: every cell in the sheet has all four neighbors.)
+    </p>
+    <p>
+      To avoid confusion, we will always express cells in this sheet as
+      row-column pairs, <em>not</em> X-Y coordinates.  Thus, the cell \((3,
+      7)\) refers to row \(3\), column \(7\).  Note that row \(0\) is the top
+      air layer, row \(M + 1\) is the bottom air layer, column \(0\) is the
+      left air layer, and column \(N + 1\) is the right air layer.
+    </p>
+    <p>
+      We will define our heat sources as rectangular regions in our sheet.  We
+      will express rectangular regions as two cells: the upper left corner
+      and the lower right corner.  For example, the region \(\{(10, 10), (20,
+      50)\}\) would be all cells with row \(r\) and column \(c\) such that \(10
+      \le r \le 20\) and \(10 \le c \le 50\).
+    </p>
+    <p>
+      To simplify things, we will assume that all heat sources are lines
+      contained in the air around the sheet.  If our sheet is an \(M \times
+      N\) grid, then our heat sources will always be rectangles \(\{(r_1,
+      c_1), (r_2, c_2)\}\) such that at least one of the following is true:
+    </p>
+    <ul>
+      <li>\(r_1 = r_2 = 0\)</li>
+      <li>\(r_1 = r_2 = M + 1\)</li>
+      <li>\(c_1 = c_2 = 0\)</li>
+      <li>\(c_1 = c_2 = N + 1\)</li>
+    </ul>
+    <p>
+      By placing our heat sources in the air region (which does not change) we
+      ensure that the heat sources remain constant.
+    </p>
+    <p>
+      We will represent temperature as a number between 0 and 1, with 1 being
+      the highest and 0 being the lowest.
+    </p>
+    <h3>Requirements</h3>
+    <ul>
+      <li>The main process should input the following:
+        <ul>
+          <li>The number \(M\) of rows in the sheet</li>
+          <li>The number \(N\) of columns in the sheet</li>
+          <li>The number \(h\) of heat sources</li>
+          <li>For each heat source:
+            <ul>
+              <li>The row, then column of the upper-left corner</li>
+              <li>The row, then column of the lower-right corner</li>
+              <li>The temperature as a number between 0 and 1, inclusive</li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+      <li>
+        Use the Jacobi method to solve Laplace's equation.  To do this,
+        repeatedly update each cell with the average of its neighbors as
+        described above.  You should do this until an update results in
+        no <em>significant</em> changes.  We will consider
+        a <em>significant</em> change any change \(\ge 0.001\).  Thus, you
+        should stop at the first \(m^k\) such that \(\forall_{i, j} |
+        m^{k}_{i, j} - m^{k-1}_{i, j} | \lt 0.001\).
+      </li>
+      <li>
+        Output the entire sheet, including the air layer.  Output one row per
+        line, separating columns with spaces.  You may have a trailing space
+        at the end of your lines.
+      </li>
+    </ul>
+    <h3>Parallelization</h3>
+    <p>
+      You <em>must</em> parallelize your solution using MPI.  Here is the
+      recommended approach:
+    </p>
+    <ul class="spaced">
+      <li>
+        Divide the sheet into even regions by dividing up the rows.  You may
+        assume that \(M\) is divisible by the number of processes.  Each
+        process will actually need to store \(M + 2\) rows: its \(M\) rows
+        plus the row above and the row beneath.
+        <p>
+          For example, suppose \(M = 8\) and we have \(4\) processes.  That
+          means we actually have \(M + 2 = 10\) rows counting the air layers.
+          Each process needs \(M / 4 = 2\) rows as follows:
+        </p>
+        <table>
+          <tr>
+            <td>
+              <div class="proc">Process 0</div>
+              <div class="ro">0</div>
+              <div class="rw">1</div>
+              <div class="rw">2</div>
+              <div class="ro">3</div>
+            </td>
+            <td>
+              <div class="proc">Process 1</div>
+              <div class="ro">2</div>
+              <div class="rw">3</div>
+              <div class="rw">4</div>
+              <div class="ro">5</div>
+            </td>
+            <td>
+              <div class="proc">Process 2</div>
+              <div class="ro">4</div>
+              <div class="rw">5</div>
+              <div class="rw">6</div>
+              <div class="ro">7</div>
+            </td>
+            <td>
+              <div class="proc">Process 3</div>
+              <div class="ro">6</div>
+              <div class="rw">7</div>
+              <div class="rw">8</div>
+              <div class="ro">9</div>
+            </td>
+          </tr>
+        </table>
+        <p>
+          The rows in parentheses will not be edited by that process; they
+          will only be used to update the rows that process is responsible
+          for.
+        </p>
+      </li>
+      <li>
+        After each update, the processes will need to communicate the
+        updated rows to their neighbors.  For example, process 0 will need
+        to send the updated row 2 to process 1, and process 1 will need to
+        send the updated row 3 to process 0.
+      </li>
+      <li>
+        Each process will need to notice if its rows have had significant
+        changes.  Then your processes will need to communicate to decide
+        whether <em>any</em> process has had significant changes.  (Hint:
+        consider <code>MPI_Allreduce</code>.)  If <em>any</em> process had
+        significant changes, then <em>all</em> processes need to continue for
+        another round.
+      </li>
+    </ul>
+    <h3>Design</h3>
+    <p>
+      You are welcome to use <a href="matrix.hpp">my matrix class</a> if you
+      wish.
+    </p>
+    <p>
+      This is a significantly larger MPI program than we have written so far.
+      There are a couple of implications of that fact.
+    </p>
+    <ol>
+      <li>
+        You need to have checkpoints.  Do <em>not</em> attempt to write the
+        whole thing and then begin debugging.  There will be way too many
+        places for bugs to hide.  Instead, try to get one small piece working,
+        then verify that it works.  For example:
+        <ul>
+          <li>
+            Have the main process input and distribute the input.  Have each
+            process print out the input to make sure it was received
+            correctly.
+          </li>
+          <li>
+            Have each process print its initial chunk of the sheet to make
+            sure it is correct.
+          </li>
+          <li>
+            Have each process make one iteration of the algorithm and print
+            its chunk to make sure it is correct.
+          </li>
+          <li>
+            Have processes exchange rows and print their chunks to make sure
+            it is correct.
+          </li>
+          <li>etc.</li>
+        </ul>
+        <p>
+          When printing chunks, I recommend using barriers to make sure output
+          comes out synchronized and not in a jumbled mess.  Here is the
+          output function I used:
+        </p>
+        <pre class="brush:cpp">
+void print_all_chunks(int tag) {
+	for (int i = 0; i &lt; num_procs; ++i) {
+		if (my_rank == i) {
+			cout &lt;&lt; '[' &lt;&lt; tag &lt;&lt; "] Process " &lt;&lt; my_rank &lt;&lt; " has chunk:\n" &lt;&lt; my_chunk &lt;&lt; endl;
+		}
+		MPI_Barrier(MPI_COMM_WORLD);
+	}
+}
+</pre>
+        <p>
+          It is recommended that you use debugging macros to make it easy to
+          include/exclude debugging output, like so:
+        </p>
+        <pre class="brush:cpp">
+#ifdef DEBUG
+		if (tag % 1000 == 0)
+			print_all_chunks(tag);
+		++tag;
+#endif
+</pre>
+        Then if you want to see the debug output you can simply add the
+        following to the top of your program:
+        <pre class="brush:cpp">
+#define DEBUG
+</pre>
+        Begin by testing your program with small test cases.  Here is a good
+        one for 1, 2, or 4 processes:
+        <pre class="example">4 4
+1
+0 0 0 5 1</pre>
+      </li>
+      <li>
+        You need to organize your program to keep it manageable.  Your
+        subroutines should be no more than one screenful and should be easy to
+        read and digest.  Here's the organization I used for my program.
+      </li>
+      <pre class="brush:cpp">
+struct laplace {
+	/*----------DATA----------*/
+
+	// Basic parameters
+	int num_procs;
+	int my_rank;
+	int num_rows;
+	int num_cols;
+	int num_rows_per_proc;
+
+	// The "extended" values include the extra rows and columns
+	int ext_rows() { return num_rows + 2; }
+	int ext_cols() { return num_cols + 2; }
+	int ext_rows_per_proc() { return num_rows_per_proc + 2; }
+
+	// The entire sheet (main only)
+	matrix&lt;double&gt; sheet;
+
+	// Each process has their own chunk of the sheet
+	matrix&lt;double&gt; my_chunk;
+
+	// Used to calculate next version of chunk without messing up my_chunk
+	// When done, you can std::swap(my_chunk, my_scratch)
+	matrix&lt;double&gt; my_scratch;
+
+
+	/*----------FUNCTIONS----------*/
+
+	// Initialize MPI and initialize variables
+	void init(int argc, char* argv[]);
+
+	// Main process gets input from user
+	void get_input();
+
+	// Main process shares input with others
+	void share_input();
+
+	// Outer edges (row 0 and M + 1) only need to be shared once (they don't change)
+	void share_outer_edges();
+
+	// Inner edges need to be shared after every update
+	void share_inner_edges();
+
+	// Replace each cell with the average of its neigbhors
+	int advance();
+
+	// Iterate until a fixed point is reached
+	void solve();
+
+	// Each process sends its results back to main process
+	void collect_results();
+
+	// Main process outputs final results
+	void print_results();
+
+	// Debugging functions
+	void print_all_chunks(int tag);
+	void log(const std::string&amp; message) {
+		std::cout &lt;&lt; my_rank &lt;&lt; ": " &lt;&lt; message &lt;&lt; endl;
+	}
+};
+</pre>
+    </ol>
+  </body>
+</html>
