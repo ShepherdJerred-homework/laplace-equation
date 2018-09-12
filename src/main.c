@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <mpi.h>
 #include <stdlib.h>
+#include <string.h>
+#include <math.h>
 
 const int MAIN_PID = 0;
 const int DEFAULT_TAG = 0;
@@ -165,21 +167,65 @@ void run(int pid, int numberOfProcesses) {
 
         fillSheetWithHeatSources(sheet, mWithAir, nWithAir, numberOfHeatSources, heatSources);
 
-
-//        printf("rpp: %i, cpr: %i\n", numberOfRowsPerProcess, numberOfCellsPerRow);
+//        printf("norpp: %i\n", numberOfRowsPerProcess);
 
 //        printParams(m, n, numberOfHeatSources, heatSources);
         printSheet(sheet, numberOfCells, nWithAir);
 
         int i;
         for (i = 0; i < numberOfProcesses; i++) {
-            MPI_Send((sheet + ((i * numberOfRowsPerProcess) * nWithAir)), numberOfCellsPerProcess, MPI_DOUBLE, i, DEFAULT_TAG,
+            MPI_Send((sheet + ((i * numberOfRowsPerProcess) * nWithAir)), numberOfCellsPerProcess, MPI_DOUBLE, i,
+                     DEFAULT_TAG,
                      MPI_COMM_WORLD);
         }
     }
 
     mySheet = calloc((size_t) numberOfCellsPerProcess, sizeof(double));
+    myOldSheet = calloc((size_t) numberOfCellsPerProcess, sizeof(double));
     MPI_Recv(mySheet, numberOfCellsPerProcess, MPI_DOUBLE, MAIN_PID, DEFAULT_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+    int i = 0;
+    int hasChanged = 1;
+    while (hasChanged == 1) {
+        memcpy(myOldSheet, mySheet, numberOfCellsPerProcess * sizeof(double));
+
+        printSheet(myOldSheet, numberOfCellsPerProcess, nWithAir);
+
+        int row;
+        int col;
+        for (row = 1; row < numberOfRowsPerProcess + 1; row++) {
+            for (col = 1; col < nWithAir - 1; col++) {
+                double rowAbove = *(myOldSheet + (((row + 1) * nWithAir) + col));
+                double rowBelow = *(myOldSheet + (((row - 1) * nWithAir) + col));
+                double colRight = *(myOldSheet + ((row * nWithAir) + (col + 1)));
+                double colLeft = *(myOldSheet + ((row * nWithAir) + (col - 1)));
+                double curr = *(myOldSheet + ((row * nWithAir) + col));
+                double sum = (rowAbove + rowBelow + colRight + colLeft);
+                double new =  sum / 4;
+                printf("i %i, r %i, c %i, curr %lf, sum %lf, new %lf, ra %lf, rb %lf, cr %lf, cl %lf\n", i, row, col, curr, sum, new, rowAbove, rowBelow, colRight,
+                       colLeft);
+                *(mySheet + ((row * nWithAir) + col)) = new;
+                if (fabs(curr - new) < .000001) {
+                    hasChanged = 0;
+                }
+            }
+        }
+
+        if (pid == 0) {
+            // Send below
+            MPI_Send(&mySheet);
+        } else if (pid == numberOfProcesses - 1) {
+            // Send above
+            MPI_Send();
+        } else {
+            // Send above and below
+            MPI_Send();
+            MPI_Send();
+        }
+
+//        printSheet(mySheet, numberOfCellsPerProcess, nWithAir);
+        i += 1;
+    }
 
 //    printf("Printing mysheet %i\n", pid);
 
@@ -193,6 +239,7 @@ void run(int pid, int numberOfProcesses) {
 //    }
 }
 
+// https://www.geeksforgeeks.org/dynamically-allocate-2d-array-c/
 int main(int argc, char **argv) {
     MPI_Init(&argc, &argv);
 
