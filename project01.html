@@ -280,7 +280,7 @@ void print_all_chunks(int tag) {
           include/exclude debugging output, like so:
         </p>
         <pre class="brush:cpp">
-#ifdef DEBUG
+#ifdef IS_DEBUG
 		if (tag % 1000 == 0)
 			print_all_chunks(tag);
 		++tag;
@@ -289,7 +289,7 @@ void print_all_chunks(int tag) {
         Then if you want to see the debug output you can simply add the
         following to the top of your program:
         <pre class="brush:cpp">
-#define DEBUG
+#define IS_DEBUG
 </pre>
         Begin by testing your program with small test cases.  Here is a good
         one for 1, 2, or 4 processes:

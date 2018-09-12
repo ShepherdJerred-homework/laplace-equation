@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 fileName="laplace"
 
-mpicc src/main.c -o out/${fileName}
+mkdir -p ../out
 
-mpirun -np 2 out/${fileName}
+mpicc ../src/main.c -o ../out/${fileName}
+
+mpirun -np 2 ../out/${fileName}
