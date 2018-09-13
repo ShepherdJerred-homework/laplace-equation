@@ -64,6 +64,8 @@ void inputData(int *m, int *n, int *numberOfHeatSources, struct HeatSource **hea
         inputHeatSource(&heatSource);
         (*heatSources)[i] = heatSource;
     }
+
+//    printf("Input finished! Executing..\n");
 }
 
 int getPid() {
@@ -102,13 +104,54 @@ void fillSheetWithHeatSources(double *sheet, int m, int n, int numberOfHeatSourc
     }
 }
 
-void printSheet(double *sheet, int numberOfCells, int n) {
+void printSheet(double *sheet, int numberOfCells, int n, int printNewline) {
     int i;
     for (i = 0; i < numberOfCells; i++) {
         if (i % n == 0) {
             printf("\n");
         }
         printf("%lf ", sheet[i]);
+    }
+    if (printNewline) {
+        printf("\n");
+    }
+}
+
+void printSheetSync(double *sheet, int numberOfCells, int n, int pid, int numberOfProcesses) {
+    int i;
+    for (i = 0; i < numberOfProcesses; i++) {
+        printSheet(sheet, numberOfCells, n, pid);
+        if (pid - 1 == numberOfProcesses) {
+            printf("\n");
+        }
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
+}
+
+void printMyRows(double *sheet, int numberOfRowsPerProcess, int nWithAir) {
+    int row;
+    int col;
+    for (row = 1; row < numberOfRowsPerProcess + 1; row++) {
+        for (col = 0; col < nWithAir; col++) {
+            printf("%lf ", *(sheet + ((row * nWithAir) + col)));
+        }
+        printf("\n");
+    }
+}
+
+void printFirstRow(double *sheet, int nWithAir) {
+    int i;
+    for (i = 0; i < nWithAir; i++) {
+        printf("%lf ", *(sheet + i));
+    }
+    printf("\n");
+}
+
+void printLastRow(double *sheet, int numberOfRowsPerProcess, int pid, int nWithAir) {
+    double* lastRow = (sheet + (((numberOfRowsPerProcess + 1) * nWithAir)));
+    int i;
+    for (i = 0; i < nWithAir; i++) {
+        printf("%lf ", *(lastRow + i));
     }
     printf("\n");
 }
@@ -150,6 +193,10 @@ void run(int pid, int numberOfProcesses) {
 
     if (pid == MAIN_PID) {
         inputData(&m, &n, &numberOfHeatSources, &heatSources);
+
+        if (numberOfProcesses % m != 0) {
+            printf("WARNING: NUM PROCESSORS NOT DIVISIBLE BY M\n");
+        }
     }
 
     MPI_Bcast(&n, 1, MPI_INT, MAIN_PID, MPI_COMM_WORLD);
@@ -170,7 +217,7 @@ void run(int pid, int numberOfProcesses) {
 //        printf("norpp: %i\n", numberOfRowsPerProcess);
 
 //        printParams(m, n, numberOfHeatSources, heatSources);
-        printSheet(sheet, numberOfCells, nWithAir);
+//        printSheet(sheet, numberOfCells, nWithAir);
 
         int i;
         for (i = 0; i < numberOfProcesses; i++) {
@@ -185,11 +232,14 @@ void run(int pid, int numberOfProcesses) {
     MPI_Recv(mySheet, numberOfCellsPerProcess, MPI_DOUBLE, MAIN_PID, DEFAULT_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
     int i = 0;
-    int hasChanged = 1;
-    while (hasChanged == 1) {
+    int shouldContinue = 1;
+    int hasChanged;
+    while (shouldContinue) {
+        hasChanged = 0;
+        shouldContinue = 0;
         memcpy(myOldSheet, mySheet, numberOfCellsPerProcess * sizeof(double));
 
-        printSheet(myOldSheet, numberOfCellsPerProcess, nWithAir);
+//        printSheet(myOldSheet, numberOfCellsPerProcess, nWithAir, 1);
 
         int row;
         int col;
@@ -201,31 +251,84 @@ void run(int pid, int numberOfProcesses) {
                 double colLeft = *(myOldSheet + ((row * nWithAir) + (col - 1)));
                 double curr = *(myOldSheet + ((row * nWithAir) + col));
                 double sum = (rowAbove + rowBelow + colRight + colLeft);
-                double new =  sum / 4;
-                printf("i %i, r %i, c %i, curr %lf, sum %lf, new %lf, ra %lf, rb %lf, cr %lf, cl %lf\n", i, row, col, curr, sum, new, rowAbove, rowBelow, colRight,
-                       colLeft);
+                double new = sum / 4;
+                double diff = curr - new;
+//                printf("i %i, r %i, c %i, curr %lf, sum %lf, new %lf, diff %lf, ra %lf, rb %lf, cr %lf, cl %lf\n", i, row, col, curr, sum, new, diff, rowAbove, rowBelow, colRight,
+//                       colLeft);
                 *(mySheet + ((row * nWithAir) + col)) = new;
-                if (fabs(curr - new) < .000001) {
-                    hasChanged = 0;
+                if (fabs(diff) > .000001) {
+                    hasChanged = 1;
+                } else {
+                    if (!hasChanged) {
+                        hasChanged = 0;
+                    }
                 }
             }
         }
 
+        double *lastRowBelongingToMe = (mySheet + (numberOfRowsPerProcess * nWithAir));
+        double *firstRowBelongingToMe = (mySheet + nWithAir);
+
+        double *firstRowInMySheet = (mySheet);
+        double *lastRowInMySheet = (mySheet + (numberOfRowsPerProcess * nWithAir) + (nWithAir));
+
+//        printSheet(firstRowBelongingToMe, nWithAir, nWithAir);
+//        printSheet(lastRowBelongingToMe, nWithAir, nWithAir);
+
+//        printf("pid %i is synchronizing\n", pid);
+
         if (pid == 0) {
-            // Send below
-            MPI_Send(&mySheet);
+            // Send to pid + 1, receive from pid + 1
+            MPI_Send(lastRowBelongingToMe, nWithAir, MPI_DOUBLE, pid + 1, DEFAULT_TAG, MPI_COMM_WORLD);
+            MPI_Recv(lastRowInMySheet, nWithAir, MPI_DOUBLE, pid + 1, DEFAULT_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         } else if (pid == numberOfProcesses - 1) {
-            // Send above
-            MPI_Send();
+            // Send to p - 1, receive from pid - 1
+            MPI_Send(firstRowBelongingToMe, nWithAir, MPI_DOUBLE, pid - 1, DEFAULT_TAG, MPI_COMM_WORLD);
+            MPI_Recv(firstRowInMySheet, nWithAir, MPI_DOUBLE, pid - 1, DEFAULT_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         } else {
-            // Send above and below
-            MPI_Send();
-            MPI_Send();
+            // Send to pid + 1, receive from pid + 1
+            MPI_Send(lastRowBelongingToMe, nWithAir, MPI_DOUBLE, pid + 1, DEFAULT_TAG, MPI_COMM_WORLD);
+            MPI_Recv(lastRowInMySheet, nWithAir, MPI_DOUBLE, pid + 1, DEFAULT_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            // Send to p - 1, receive from pid - 1
+            MPI_Send(firstRowBelongingToMe, nWithAir, MPI_DOUBLE, pid - 1, DEFAULT_TAG, MPI_COMM_WORLD);
+            MPI_Recv(firstRowInMySheet, nWithAir, MPI_DOUBLE, pid - 1, DEFAULT_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         }
 
-//        printSheet(mySheet, numberOfCellsPerProcess, nWithAir);
+//        printf("pid %i has finished with iteration %i\n", pid, i);
+
+//        if (pid == MAIN_PID) {
+//            printf("\nSTATE AFTER ITERATION %i\n", i);
+//        }
+//        printSheetSync(mySheet, numberOfCellsPerProcess, nWithAir, pid, numberOfProcesses);
+//        if (pid == numberOfProcesses - 1) {
+//            printf("\n");
+//        }
+
+        MPI_Allreduce(&hasChanged, &shouldContinue, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+//        printf("hc %i, sc %i", hasChanged, shouldContinue);
+
         i += 1;
     }
+
+
+    for (i = 0; i < numberOfProcesses; i++) {
+        if (pid == i && pid == 0) {
+            printf("\nFirst row\n");
+            printFirstRow(mySheet, nWithAir);
+        }
+        if (pid == i) {
+//            printf("pid %i\n", pid);
+            printMyRows(mySheet, numberOfRowsPerProcess, nWithAir);
+        }
+        if (pid == i && pid == numberOfProcesses - 1) {
+            printLastRow(mySheet, numberOfRowsPerProcess, pid, nWithAir);
+        }
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
+
+//    printSheetSync(mySheet, numberOfCellsPerProcess, nWithAir, pid, numberOfProcesses);
+
+//    printf("Loop is done %i\n", pid);
 
 //    printf("Printing mysheet %i\n", pid);
 
