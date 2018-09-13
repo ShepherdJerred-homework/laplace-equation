@@ -22,19 +22,19 @@ void inputHeatSource(struct HeatSource *heatSource) {
     int lowerRightColumn;
     double temp;
 
-    printf("Upper left row:\n");
-    scanf("%i", &upperLeftRow);
-
-    printf("Upper left column:\n");
+//    printf("Upper left row:\n");
     scanf("%i", &upperLeftColumn);
 
-    printf("Lower right row:\n");
-    scanf("%i", &lowerRightRow);
+//    printf("Upper left column:\n");
+    scanf("%i", &upperLeftRow);
 
-    printf("Lower right column:\n");
+//    printf("Lower right row:\n");
     scanf("%i", &lowerRightColumn);
 
-    printf("Temp (0-1):\n");
+//    printf("Lower right column:\n");
+    scanf("%i", &lowerRightRow);
+
+//    printf("Temp (0-1):\n");
     scanf("%lf", &temp);
 
     heatSource->upperLeftRow = upperLeftRow;
@@ -46,20 +46,20 @@ void inputHeatSource(struct HeatSource *heatSource) {
 
 void inputData(int *m, int *n, int *numberOfHeatSources, struct HeatSource **heatSources) {
 
-    printf("M:\n");
+//    printf("M:\n");
     scanf("%i", m);
 
-    printf("N:\n");
+//    printf("N:\n");
     scanf("%i", n);
 
-    printf("Number of heat sources:\n");
+//    printf("Number of heat sources:\n");
     scanf("%i", numberOfHeatSources);
 
     *heatSources = calloc((size_t) *numberOfHeatSources, sizeof(struct HeatSource));
 
     int i;
     for (i = 0; i < *numberOfHeatSources; i++) {
-        printf("Heat source %i:\n", i);
+//        printf("Heat source %i:\n", i);
         struct HeatSource heatSource;
         inputHeatSource(&heatSource);
         (*heatSources)[i] = heatSource;
@@ -195,7 +195,7 @@ void run(int pid, int numberOfProcesses) {
         inputData(&m, &n, &numberOfHeatSources, &heatSources);
 
         if (numberOfProcesses % m != 0) {
-            printf("WARNING: NUM PROCESSORS NOT DIVISIBLE BY M\n");
+//            printf("WARNING: NUM PROCESSORS NOT DIVISIBLE BY M\n");
         }
     }
 
@@ -313,7 +313,7 @@ void run(int pid, int numberOfProcesses) {
 
     for (i = 0; i < numberOfProcesses; i++) {
         if (pid == i && pid == 0) {
-            printf("\nFirst row\n");
+//            printf("\nFirst row\n");
             printFirstRow(mySheet, nWithAir);
         }
         if (pid == i) {
