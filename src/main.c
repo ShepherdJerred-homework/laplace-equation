@@ -109,7 +109,7 @@ void printMyRows(double *sheet, int numberOfRowsPerProcess, int nWithAir) {
     int col;
     for (row = 1; row < numberOfRowsPerProcess + 1; row++) {
         for (col = 0; col < nWithAir; col++) {
-            printf("%lf ", *(sheet + ((row * nWithAir) + col)));
+            printf("%.3lf ", *(sheet + ((row * nWithAir) + col)));
         }
         printf("\n");
     }
@@ -118,7 +118,7 @@ void printMyRows(double *sheet, int numberOfRowsPerProcess, int nWithAir) {
 void printFirstRow(double *sheet, int nWithAir) {
     int i;
     for (i = 0; i < nWithAir; i++) {
-        printf("%lf ", *(sheet + i));
+        printf("%.3lf ", *(sheet + i));
     }
     printf("\n");
 }
@@ -127,7 +127,7 @@ void printLastRow(double *sheet, int numberOfRowsPerProcess, int pid, int nWithA
     double *lastRow = (sheet + (((numberOfRowsPerProcess + 1) * nWithAir)));
     int i;
     for (i = 0; i < nWithAir; i++) {
-        printf("%lf ", *(lastRow + i));
+        printf("%.3lf ", *(lastRow + i));
     }
     printf("\n");
 }
